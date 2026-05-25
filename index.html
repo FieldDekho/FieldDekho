@@ -2101,10 +2101,23 @@ async function saveModalItem() {
   }
 
   const table = type === 'product' ? 'products' : type === 'dealer' ? 'dealers' : 'users';
+
+  // Remove company_id from update payload — only needed for insert
+  const updatePayload = { ...payload };
+  delete updatePayload.company_id;
+
+  let error;
   if (editingId) {
-    await sb.from(table).update(payload).eq('id', editingId);
+    const res = await sb.from(table).update(updatePayload).eq('id', editingId);
+    error = res.error;
   } else {
-    await sb.from(table).insert(payload);
+    const res = await sb.from(table).insert(payload);
+    error = res.error;
+  }
+
+  if (error) {
+    showToast('Save failed: ' + error.message, 'error');
+    return;
   }
 
   closeModal('addModal');
