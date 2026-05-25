@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="theme-color" content="#FF6B2B">
-<meta name="apple-mobile-web-app-capable" content="ayes">
+<meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="FieldDekho">
 <link rel="manifest" href="manifest.json">
@@ -1112,9 +1112,9 @@ select option { background: #222; }
 
       <!-- Data Management -->
       <div id="dataTab" style="display:none">
-        <div class="admin-tabs" style="margin-bottom:14px">
-          <button class="admin-tab active" onclick="setDataTab('products',this)">Products</button>
-          <button class="admin-tab" onclick="setDataTab('dealers',this)">Dealers</button>
+        <div class="data-sub-tabs" style="display:flex;gap:8px;margin-bottom:14px;border-bottom:2px solid var(--border);padding-bottom:0">
+          <button class="data-sub-tab active" onclick="setDataTab('products',this)" style="background:none;border:none;border-bottom:2px solid var(--accent);color:var(--text);font-family:var(--font-body);font-size:14px;font-weight:600;padding:8px 16px;cursor:pointer;margin-bottom:-2px;transition:all 0.15s">📦 Products</button>
+          <button class="data-sub-tab" onclick="setDataTab('dealers',this)" style="background:none;border:none;border-bottom:2px solid transparent;color:var(--muted);font-family:var(--font-body);font-size:14px;font-weight:500;padding:8px 16px;cursor:pointer;margin-bottom:-2px;transition:all 0.15s">🏪 Dealers</button>
         </div>
 
         <div id="productsDataTab">
@@ -1796,16 +1796,18 @@ async function loadAdminData() {
   allOrders.forEach(o => (o.order_items||[]).forEach(i => {
     prodCount[i.product_name] = (prodCount[i.product_name]||0) + i.quantity;
   }));
-  const topProds = Object.entries(prodCount).sort((a,b) => b[1]-a[1]).slice(0,8);
+  const topProds = Object.entries(prodCount).sort((a,b) => b[1]-a[1]).slice(0,5);
   const maxProd = topProds[0]?.[1] || 1;
+  const medals = ['🥇','🥈','🥉','4️⃣','5️⃣'];
   document.getElementById('topProducts').innerHTML = topProds.length
-    ? topProds.map(([name, qty]) => `
-      <div style="margin-bottom:10px">
-        <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px">
-          <span>${name}</span><span style="color:var(--accent);font-weight:600">${qty} units</span>
+    ? topProds.map(([name, qty], i) => `
+      <div style="margin-bottom:12px">
+        <div style="display:flex;justify-content:space-between;align-items:center;font-size:13px;margin-bottom:5px">
+          <span style="display:flex;align-items:center;gap:8px"><span style="font-size:16px">${medals[i]}</span><span style="font-weight:500">${name}</span></span>
+          <span style="color:var(--accent);font-weight:700;font-size:14px">${qty} units</span>
         </div>
         <div style="background:var(--surface2);border-radius:4px;height:6px">
-          <div style="background:var(--accent);height:6px;border-radius:4px;width:${(qty/maxProd*100).toFixed(0)}%"></div>
+          <div style="background:${i===0?'var(--accent)':i===1?'#aaa':i===2?'#cd7f32':'var(--muted2)'};height:6px;border-radius:4px;width:${(qty/maxProd*100).toFixed(0)}%;transition:width 0.5s"></div>
         </div>
       </div>`).join('')
     : '<div class="empty-state"><p>No orders yet</p></div>';
@@ -1813,11 +1815,20 @@ async function loadAdminData() {
   // Salesperson performance
   const spCount = {};
   allOrders.forEach(o => { spCount[o.salesperson_name] = (spCount[o.salesperson_name]||0) + 1; });
-  const spSorted = Object.entries(spCount).sort((a,b) => b[1]-a[1]);
+  const spSorted = Object.entries(spCount).sort((a,b) => b[1]-a[1]).slice(0,5);
+  const maxSp = spSorted[0]?.[1] || 1;
+  const spMedals = ['🥇','🥈','🥉','4️⃣','5️⃣'];
   document.getElementById('spPerformance').innerHTML = spSorted.length
-    ? `<table class="data-table"><thead><tr><th>Salesperson</th><th>Orders</th></tr></thead><tbody>
-      ${spSorted.map(([name,cnt]) => `<tr><td>${name}</td><td style="font-weight:700;color:var(--accent)">${cnt}</td></tr>`).join('')}
-      </tbody></table>`
+    ? spSorted.map(([name,cnt], i) => `
+      <div style="margin-bottom:12px">
+        <div style="display:flex;justify-content:space-between;align-items:center;font-size:13px;margin-bottom:5px">
+          <span style="display:flex;align-items:center;gap:8px"><span style="font-size:16px">${spMedals[i]}</span><span style="font-weight:500">${name}</span></span>
+          <span style="color:var(--success);font-weight:700;font-size:14px">${cnt} orders</span>
+        </div>
+        <div style="background:var(--surface2);border-radius:4px;height:6px">
+          <div style="background:${i===0?'var(--success)':i===1?'#aaa':i===2?'#cd7f32':'var(--muted2)'};height:6px;border-radius:4px;width:${(cnt/maxSp*100).toFixed(0)}%;transition:width 0.5s"></div>
+        </div>
+      </div>`).join('')
     : '<div class="empty-state"><p>No data</p></div>';
 
   // Zone wise
@@ -1926,8 +1937,15 @@ function setAdminTab(tab, el) {
 }
 
 function setDataTab(tab, el) {
-  document.querySelectorAll('#dataTab .admin-tabs .admin-tab').forEach(t => t.classList.remove('active'));
-  el.classList.add('active');
+  // Update tab styles
+  document.querySelectorAll('.data-sub-tab').forEach(t => {
+    t.style.borderBottom = '2px solid transparent';
+    t.style.color = 'var(--muted)';
+    t.style.fontWeight = '500';
+  });
+  el.style.borderBottom = '2px solid var(--accent)';
+  el.style.color = 'var(--text)';
+  el.style.fontWeight = '600';
   document.getElementById('productsDataTab').style.display = tab === 'products' ? 'block' : 'none';
   document.getElementById('dealersDataTab').style.display  = tab === 'dealers'  ? 'block' : 'none';
 }
