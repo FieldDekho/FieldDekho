@@ -1112,9 +1112,9 @@ select option { background: #222; }
 
       <!-- Data Management -->
       <div id="dataTab" style="display:none">
-        <div class="data-sub-tabs" style="display:flex;gap:8px;margin-bottom:14px;border-bottom:2px solid var(--border);padding-bottom:0">
-          <button class="data-sub-tab active" onclick="setDataTab('products',this)" style="background:none;border:none;border-bottom:2px solid var(--accent);color:var(--text);font-family:var(--font-body);font-size:14px;font-weight:600;padding:8px 16px;cursor:pointer;margin-bottom:-2px;transition:all 0.15s">📦 Products</button>
-          <button class="data-sub-tab" onclick="setDataTab('dealers',this)" style="background:none;border:none;border-bottom:2px solid transparent;color:var(--muted);font-family:var(--font-body);font-size:14px;font-weight:500;padding:8px 16px;cursor:pointer;margin-bottom:-2px;transition:all 0.15s">🏪 Dealers</button>
+        <div class="data-sub-tabs" style="display:flex;gap:0;margin-bottom:14px;border-bottom:2px solid var(--border);padding-bottom:0">
+          <button id="dataTabProducts" class="data-sub-tab" onclick="setDataTab('products',this)" style="background:none;border:none;border-bottom:3px solid var(--accent);color:var(--accent);font-family:var(--font-body);font-size:14px;font-weight:700;padding:10px 20px;cursor:pointer;margin-bottom:-2px;transition:all 0.15s">📦 Products</button>
+          <button id="dataTabDealers" class="data-sub-tab" onclick="setDataTab('dealers',this)" style="background:none;border:none;border-bottom:3px solid transparent;color:var(--muted);font-family:var(--font-body);font-size:14px;font-weight:500;padding:10px 20px;cursor:pointer;margin-bottom:-2px;transition:all 0.15s">🏪 Dealers</button>
         </div>
 
         <div id="productsDataTab">
@@ -1937,15 +1937,14 @@ function setAdminTab(tab, el) {
 }
 
 function setDataTab(tab, el) {
-  // Update tab styles
   document.querySelectorAll('.data-sub-tab').forEach(t => {
-    t.style.borderBottom = '2px solid transparent';
+    t.style.borderBottom = '3px solid transparent';
     t.style.color = 'var(--muted)';
     t.style.fontWeight = '500';
   });
-  el.style.borderBottom = '2px solid var(--accent)';
-  el.style.color = 'var(--text)';
-  el.style.fontWeight = '600';
+  el.style.borderBottom = '3px solid var(--accent)';
+  el.style.color = 'var(--accent)';
+  el.style.fontWeight = '700';
   document.getElementById('productsDataTab').style.display = tab === 'products' ? 'block' : 'none';
   document.getElementById('dealersDataTab').style.display  = tab === 'dealers'  ? 'block' : 'none';
 }
