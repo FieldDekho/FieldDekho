@@ -1461,7 +1461,7 @@ function renderProductDrop(list) {
   productDrop.innerHTML = list.length
     ? list.map(p => {
         const isOut = (parseInt(p.stock)||0) <= 0;
-        return `<div class="drop-item ${isOut?'disabled':''}" onclick="${isOut?'':''selectProduct('${p.id}')"}">
+        return `<div class="drop-item ${isOut?'disabled':''}" ${isOut?'':'onclick="selectProduct(\''+p.id+'\')"'}>
           ${p.name}<div class="sub">SKU: ${p.sku_id} | MRP: ₹${p.mrp} | Stock: ${isOut?'<span style="color:var(--error)">Out of stock</span>':p.stock}</div>
         </div>`;
       }).join('')
