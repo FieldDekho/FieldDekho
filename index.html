@@ -1892,27 +1892,39 @@ async function cancelOrder(orderId) {
 async function openModifyOrder(orderId) {
   const { data: order } = await sb.from('orders').select('*, order_items(*)').eq('order_id', orderId).single();
   if (!order) return;
+
+  // Store items globally so saveModifyOrder can access them without passing via onclick
+  window._modifyOrderId = orderId;
+  window._modifyItems = order.order_items || [];
+
   const body = document.getElementById('modifyModalBody');
-  body.innerHTML = `
-    <div class="field"><label>Dealer</label><input type="text" value="${order.dealer_name}" readonly style="color:var(--muted)"></div>
-    <div class="field"><label>Remarks</label><textarea id="modifyRemarks">${order.remarks||''}</textarea></div>
-    <div class="section-head" style="margin-top:16px">Items</div>
-    ${(order.order_items||[]).map(i => `
-      <div class="item-row">
-        <div class="item-info">
-          <div class="item-name">${i.product_name}</div>
-          <div class="item-meta">SKU: ${i.sku_id} | MRP: ₹${i.mrp}</div>
-        </div>
-        <input type="number" value="${i.quantity}" min="1" style="width:70px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:6px;color:var(--text);text-align:center" id="modQty_${i.id}">
-      </div>`).join('')}
-    <button class="action-btn primary" style="width:100%;padding:12px;margin-top:16px;font-size:15px" onclick="saveModifyOrder('${orderId}', ${JSON.stringify(order.order_items||[]).replace(/'/g,"&#39;")})">Save Changes</button>
-  `;
+  // Build items HTML separately to avoid nested template literal issues
+  const itemsHtml = (order.order_items||[]).map(i => {
+    return '<div class="item-row">'
+      + '<div class="item-info">'
+      + '<div class="item-name">' + i.product_name + '</div>'
+      + '<div class="item-meta">SKU: ' + i.sku_id + ' | MRP: Rs.' + i.mrp + '</div>'
+      + '</div>'
+      + '<input type="number" value="' + i.quantity + '" min="1" style="width:70px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:6px;color:var(--text);text-align:center" id="modQty_' + i.id + '">'
+      + '</div>';
+  }).join('');
+
+  body.innerHTML = '<div class="field"><label>DEALER</label><input type="text" value="' + order.dealer_name + '" readonly style="color:var(--muted);width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:11px 14px;font-size:14px;color:var(--muted)"></div>'
+    + '<div class="field"><label>REMARKS</label><textarea id="modifyRemarks" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:11px 14px;font-size:14px;color:var(--text);min-height:80px;font-family:var(--font-body)">' + (order.remarks||'') + '</textarea></div>'
+    + '<div class="section-head" style="margin-top:16px;font-size:11px;font-weight:600;color:var(--accent);letter-spacing:1.5px;text-transform:uppercase">Items</div>'
+    + itemsHtml
+    + '<button class="action-btn primary" style="width:100%;padding:12px;margin-top:16px;font-size:15px" onclick="saveModifyOrder()">Save Changes</button>';
   openModal('modifyModal');
 }
 
-async function saveModifyOrder(orderId, items) {
+async function saveModifyOrder() {
+  const orderId = window._modifyOrderId;
+  const items   = window._modifyItems || [];
   const remarks = document.getElementById('modifyRemarks').value;
-  await sb.from('orders').update({ remarks }).eq('order_id', orderId);
+
+  const { error } = await sb.from('orders').update({ remarks }).eq('order_id', orderId);
+  if (error) return showToast('Failed to update: ' + error.message, 'error');
+
   for (const item of items) {
     const newQty = parseInt(document.getElementById('modQty_'+item.id)?.value) || item.quantity;
     if (newQty !== item.quantity) {
