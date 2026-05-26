@@ -1120,7 +1120,7 @@ select option { background: #222; }
         <div id="productsDataTab">
           <div style="display:flex;gap:8px;margin-bottom:14px">
             <button class="action-btn primary" onclick="openAddModal('product')">+ Add Product</button>
-            <button class="action-btn secondary" onclick="openBulkModal('product')">📤 Bulk Upload</button>
+            
           </div>
           <div class="card" style="overflow-x:auto">
             <table class="data-table" id="productsTable">
@@ -1133,7 +1133,7 @@ select option { background: #222; }
         <div id="dealersDataTab" style="display:none">
           <div style="display:flex;gap:8px;margin-bottom:14px">
             <button class="action-btn primary" onclick="openAddModal('dealer')">+ Add Dealer</button>
-            <button class="action-btn secondary" onclick="openBulkModal('dealer')">📤 Bulk Upload</button>
+            
           </div>
           <div class="card" style="overflow-x:auto">
             <table class="data-table" id="dealersTable">
@@ -1205,13 +1205,6 @@ select option { background: #222; }
   </div>
 </div>
 
-<!-- Bulk Upload Modal -->
-<div class="modal-overlay" id="bulkModal">
-  <div class="modal">
-    <div class="modal-title">
-      <span id="bulkModalTitle">Bulk Upload</span>
-      <button class="modal-close" onclick="closeModal('bulkModal')">✕</button>
-    </div>
     <div class="upload-options">
       <div class="upload-opt selected" id="optExcel" onclick="selectUploadOpt('excel')">
         <div class="opt-icon">📊</div>
@@ -1919,14 +1912,17 @@ async function openModifyOrder(orderId) {
 
 async function saveModifyOrder() {
   const orderId = window._modifyOrderId;
-  const items   = window._modifyItems || [];
-  const remarks = document.getElementById('modifyRemarks').value;
+  const items   = Array.isArray(window._modifyItems) ? window._modifyItems : [];
+  const remarks = document.getElementById('modifyRemarks')?.value || '';
+
+  if (!orderId) return showToast('Order ID missing. Close and try again.', 'error');
 
   const { error } = await sb.from('orders').update({ remarks }).eq('order_id', orderId);
   if (error) return showToast('Failed to update: ' + error.message, 'error');
 
   for (const item of items) {
-    const newQty = parseInt(document.getElementById('modQty_'+item.id)?.value) || item.quantity;
+    const input = document.getElementById('modQty_' + item.id);
+    const newQty = input ? (parseInt(input.value) || item.quantity) : item.quantity;
     if (newQty !== item.quantity) {
       await sb.from('order_items').update({ quantity: newQty }).eq('id', item.id);
     }
@@ -2044,14 +2040,23 @@ async function editItem(type, id) {
 }
 
 function getModalForm(type, data) {
-  if (type === 'product') return `
-    <div class="field"><label>SKU ID *</label><input id="mf_sku" value="${data?.sku_id||''}" placeholder="e.g. SKU001"></div>
+  if (type === 'product') {
+    // Auto-generate next SKU number
+    const existingSkus = formData.products.map(p => parseInt((p.sku_id||'').replace(/[^0-9]/g,''))||0);
+    const nextSku = existingSkus.length ? Math.max(...existingSkus) + 1 : 1;
+    const autoSku = data?.sku_id || ('SKU' + String(nextSku).padStart(3,'0'));
+    return `
+    <div class="field">
+      <label>SKU ID</label>
+      <input id="mf_sku" value="${autoSku}" readonly style="color:var(--accent);font-family:monospace;font-weight:700;cursor:default">
+    </div>
     <div class="field"><label>Product Name *</label><input id="mf_name" value="${data?.name||''}" placeholder="Product name"></div>
     <div class="field"><label>Category</label><input id="mf_cat" value="${data?.category||''}" placeholder="e.g. Suitcase ABS"></div>
     <div class="two-col">
       <div class="field"><label>MRP ₹ *</label><input id="mf_mrp" type="number" value="${data?.mrp||''}" placeholder="0"></div>
       <div class="field"><label>Stock *</label><input id="mf_stock" type="number" value="${data?.stock||''}" placeholder="0"></div>
     </div>`;
+  }
   if (type === 'dealer') return `
     <div class="field"><label>Dealer Name *</label><input id="mf_name" value="${data?.name||''}" placeholder="Dealer name"></div>
     <div class="two-col">
@@ -2143,99 +2148,6 @@ async function saveModalItem() {
 // ═══════════════════════════════════════════
 // BULK UPLOAD
 // ═══════════════════════════════════════════
-function openBulkModal(type) {
-  bulkUploadType = type;
-  document.getElementById('bulkModalTitle').textContent = `Bulk Upload ${type === 'product' ? 'Products' : 'Dealers'}`;
-  selectUploadOpt('excel');
-  document.getElementById('bulkFileInput').value = '';
-  document.getElementById('bulkPreview').textContent = '';
-  document.getElementById('gsheetUrl').value = '';
-  openModal('bulkModal');
-}
-
-function selectUploadOpt(opt) {
-  uploadOpt = opt;
-  document.getElementById('optExcel').classList.toggle('selected', opt === 'excel');
-  document.getElementById('optGsheet').classList.toggle('selected', opt === 'gsheet');
-  document.getElementById('excelUploadSection').style.display = opt === 'excel' ? 'block' : 'none';
-  document.getElementById('gsheetUploadSection').style.display = opt === 'gsheet' ? 'block' : 'none';
-}
-
-async function processBulkUpload() {
-  if (uploadOpt === 'excel') {
-    const file = document.getElementById('bulkFileInput').files[0];
-    if (!file) return showToast('Select a file first', 'error');
-    const reader = new FileReader();
-    reader.onload = async e => {
-      const wb = XLSX.read(e.target.result, { type: 'binary' });
-      const ws = wb.Sheets[wb.SheetNames[0]];
-      const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
-      await insertBulkRows(rows);
-    };
-    reader.readAsBinaryString(file);
-  } else {
-    const url = document.getElementById('gsheetUrl').value.trim();
-    if (!url) return showToast('Paste a Google Sheet URL', 'error');
-    const match = url.match(/\/d\/([a-zA-Z0-9-_]+)/);
-    if (!match) return showToast('Invalid Google Sheet URL', 'error');
-    const sheetId = match[1];
-    // Use gid=0 for first sheet, export as csv
-    const csvUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&sheet=Sheet1`;
-    try {
-      const resp = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(csvUrl)}`);
-      const json = await resp.json();
-      const text = json.contents;
-      if (!text || text.length < 10) return showToast('Sheet is empty or not public', 'error');
-      const wb = XLSX.read(text, { type: 'string' });
-      const ws = wb.Sheets[wb.SheetNames[0]];
-      const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
-      await insertBulkRows(rows);
-    } catch(err) {
-      showToast('Could not fetch sheet. Make sure sharing is set to Anyone with link.', 'error');
-    }
-  }
-}
-
-async function insertBulkRows(rows) {
-  if (!rows.length) return showToast('No data found in file', 'error');
-  showLoading(`Importing ${rows.length} rows...`);
-  const type = bulkUploadType;
-
-  let payload = [];
-  if (type === 'product') {
-    payload = rows.map(r => ({
-      company_id: currentUser.company_id,
-      sku_id:   String(r['SKUID'] || r['sku_id'] || r['SKU ID'] || '').trim(),
-      name:     String(r['SKUName'] || r['name'] || r['Product Name'] || '').trim(),
-      category: String(r['Category'] || r['category'] || '').trim(),
-      mrp:      parseFloat(r['MRP'] || r['mrp'] || 0),
-      stock:    parseInt(r['StockAvailable'] || r['stock'] || r['Stock'] || 0)
-    })).filter(r => r.sku_id && r.name);
-  } else {
-    payload = rows.map(r => ({
-      company_id: currentUser.company_id,
-      name:  String(r['DealerName'] || r['name'] || r['Dealer Name'] || '').trim(),
-      city:  String(r['City'] || r['city'] || '').trim(),
-      state: String(r['State'] || r['state'] || '').trim(),
-      zone:  String(r['Zone'] || r['zone'] || '').trim(),
-      phone: String(r['Phone'] || r['phone'] || '').trim()
-    })).filter(r => r.name);
-  }
-
-  const table = type === 'product' ? 'products' : 'dealers';
-  // Insert in batches of 100
-  for (let i = 0; i < payload.length; i += 100) {
-    await sb.from(table).insert(payload.slice(i, i+100));
-  }
-
-  hideLoading();
-  closeModal('bulkModal');
-  showToast(`✓ ${payload.length} ${type}s imported!`, 'success');
-  loadFormData();
-  if (type === 'product') loadProductsTable();
-  else loadDealersTable();
-}
-
 // ═══════════════════════════════════════════
 // MODAL HELPERS
 // ═══════════════════════════════════════════
@@ -2258,7 +2170,7 @@ function showToast(msg, type='info') {
   const t = document.getElementById('toast');
   t.textContent = msg;
   t.className = 'toast ' + type + ' show';
-  setTimeout(() => t.classList.remove('show'), 3000);
+  setTimeout(() => t.classList.remove('show'), 4000);
 }
 </script>
 </body>
